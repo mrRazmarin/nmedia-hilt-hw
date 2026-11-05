@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.imagepicker)
     implementation(libs.ucrop)
     implementation(libs.hilt.android)
+    implementation(libs.androidx.paging.runtime.ktx)
     ksp(libs.hilt.compiler)
     coreLibraryDesugaring(libs.desugaring)
 }
