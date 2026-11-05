@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.core.net.toFile
 import androidx.lifecycle.*
 import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -44,11 +45,13 @@ class PostViewModel @Inject constructor(
 ) : ViewModel() {
     val data: Flow<PagingData<Post>> = auth.authStateFlow
         .flatMapLatest { (myId, _) ->
-            repository.data
+            repository.getData()
                 .map { posts ->
                     posts.map { it.copy(ownedByMe = it.authorId == myId) }
                 }
-        }.flowOn(Dispatchers.Default)
+        }
+        .cachedIn(viewModelScope)
+        .flowOn(Dispatchers.Default)
 
     private val _dataState = MutableLiveData<FeedModelState>()
     val dataState: LiveData<FeedModelState>

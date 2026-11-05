@@ -32,6 +32,8 @@ class PostPagingSource(
             return LoadResult.Page(data, prevKey = params.key, data.lastOrNull()?.id)
         }catch (e: IOException) {
             return LoadResult.Error(e)
+        }catch (e: Exception) {
+            return LoadResult.Error(e)
         }
 
 
