@@ -25,73 +25,137 @@ class PostRemoteMediator(
         loadType: LoadType,
         state: PagingState<Int, PostEntity>
     ): MediatorResult {
-        try {
-            val result = when (loadType) {
-                LoadType.REFRESH -> {
-                    apiService.getLatest(state.config.pageSize)
-                }
-                LoadType.PREPEND -> {
-                    val id = postRemoteKeyDao.max() ?: return MediatorResult.Success(false)
-                    apiService.getAfter(id, state.config.pageSize)
-                }
-                LoadType.APPEND -> {
-                    val id = postRemoteKeyDao.min() ?: return MediatorResult.Success(false)
-                    apiService.getBefore(id, state.config.pageSize)
-                }
-            }
+        return when (loadType) {
+            LoadType.REFRESH -> {
+                try {
+                    val result = apiService.getLatest(state.config.pageSize)
+                    
+                    if (!result.isSuccessful){
+                        throw ApiError(result.code(), result.message())
+                    }
 
-            if (!result.isSuccessful){
-                throw ApiError(result.code(), result.message())
-            }
+                    val data = result.body() ?: throw ApiError(
+                        result.code(),
+                        result.message()
+                    )
 
-            val data = result.body() ?: throw ApiError(
-                result.code(),
-                result.message()
-            )
+                    val isDbEmpty = appDb.postDao().isEmpty()
 
-            appDb.withTransaction {
-                when(loadType) {
-                    LoadType.REFRESH -> {
-                        postDao.clear()
-                        postRemoteKeyDao.insert(
-                            listOf(
-                                PostRemoteKeyEntity(
-                                    PostRemoteKeyEntity.KeyType.AFTER,
-                                    data.first().id
-                                ),
-                                PostRemoteKeyEntity(
-                                    PostRemoteKeyEntity.KeyType.BEFORE,
-                                    data.last().id
+                    if (isDbEmpty) {
+                        appDb.withTransaction {
+                            postRemoteKeyDao.insert(
+                                listOf(
+                                    PostRemoteKeyEntity(
+                                        PostRemoteKeyEntity.KeyType.AFTER,
+                                        data.lastOrNull()?.id ?: 0L
+                                    ),
+                                    PostRemoteKeyEntity(
+                                        PostRemoteKeyEntity.KeyType.BEFORE,
+                                        data.first().id
+                                    )
                                 )
                             )
-                        )
+                            postDao.insert(data.map { PostEntity.fromDto(it) })
+                        }
                     }
-                    LoadType.PREPEND -> {
-                        postRemoteKeyDao.insert(
-                            PostRemoteKeyEntity(
-                                PostRemoteKeyEntity.KeyType.AFTER,
-                                data.first().id
-                            )
-                        )
+                    else {
+                        val currentMinId = postRemoteKeyDao.min() ?: 0L
+
+                        if (data.isNotEmpty() && data.first().id < currentMinId) {
+                            appDb.withTransaction {
+                                postRemoteKeyDao.insert(
+                                    PostRemoteKeyEntity(
+                                        PostRemoteKeyEntity.KeyType.BEFORE,
+                                        data.first().id
+                                    )
+                                )
+                                postDao.insert(data.map { PostEntity.fromDto(it) })
+                            }
+                        }
+                        else if (data.isEmpty()) {
+                            appDb.withTransaction {
+                                postRemoteKeyDao.insert(
+                                    listOf(
+                                        PostRemoteKeyEntity(
+                                            PostRemoteKeyEntity.KeyType.AFTER,
+                                            currentMinId
+                                        ),
+                                        PostRemoteKeyEntity(
+                                            PostRemoteKeyEntity.KeyType.BEFORE,
+                                            currentMinId
+                                        )
+                                    )
+                                )
+                            }
+                        }
                     }
-                    LoadType.APPEND -> {
-                        postRemoteKeyDao.insert(
-                            PostRemoteKeyEntity(
-                                PostRemoteKeyEntity.KeyType.BEFORE,
-                                data.first().id
-                            )
-                        )
-                    }
+
+                    MediatorResult.Success(endOfPaginationReached = data.isEmpty())
+                } catch (e: IOException) {
+                    MediatorResult.Error(e)
+                } catch (e: Exception) {
+                    MediatorResult.Error(e)
                 }
-
-                postDao.insert(data.map { PostEntity.fromDto(it) })
             }
+            
+            LoadType.PREPEND -> {
+                MediatorResult.Success(endOfPaginationReached = true)
+            }
+            
+            LoadType.APPEND -> {
+                try {
+                    val isDbEmpty = appDb.postDao().isEmpty()
 
-            return MediatorResult.Success(data.isEmpty())
-        }catch (e: IOException) {
-            return MediatorResult.Error(e)
-        }catch (e: Exception) {
-            return MediatorResult.Error(e)
+                    val beforeKey = if (!isDbEmpty) {
+                        postRemoteKeyDao.min() ?: 0L
+                    } else {
+                        0L
+                    }
+                    
+                    val result = apiService.getBefore(
+                        beforeKey,
+                        state.config.pageSize
+                    )
+                    
+                    if (!result.isSuccessful){
+                        throw ApiError(result.code(), result.message())
+                    }
+
+                    val data = result.body() ?: throw ApiError(
+                        result.code(),
+                        result.message()
+                    )
+
+                    if (data.isNotEmpty()) {
+                        appDb.withTransaction {
+                            postRemoteKeyDao.insert(
+                                PostRemoteKeyEntity(
+                                    PostRemoteKeyEntity.KeyType.BEFORE,
+                                    data.first().id
+                                )
+                            )
+                            postDao.insert(data.map { PostEntity.fromDto(it) })
+                        }
+                    } else {
+                        // Если постов нет, сохраняем текущий BEFORE ключ
+                        appDb.withTransaction {
+                            val currentBeforeKey = postRemoteKeyDao.min() ?: beforeKey
+                            postRemoteKeyDao.insert(
+                                PostRemoteKeyEntity(
+                                    PostRemoteKeyEntity.KeyType.BEFORE,
+                                    currentBeforeKey
+                                )
+                            )
+                        }
+                    }
+
+                    MediatorResult.Success(endOfPaginationReached = data.isEmpty())
+                } catch (e: IOException) {
+                    MediatorResult.Error(e)
+                } catch (e: Exception) {
+                    MediatorResult.Error(e)
+                }
+            }
         }
     }
 }
