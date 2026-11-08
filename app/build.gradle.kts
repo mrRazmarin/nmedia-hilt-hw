@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.room)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.paging)
     implementation(platform(libs.firebase))
     implementation(libs.firebase.messaging)
     implementation(libs.play.services)
