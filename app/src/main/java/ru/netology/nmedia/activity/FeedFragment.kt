@@ -64,12 +64,17 @@ class FeedFragment : Fragment() {
                 adapter.retry()
             },
         )
-        viewModel.dataState.observe(viewLifecycleOwner) { state ->
-            binding.progress.isVisible = state.loading
-            binding.swiperefresh.isRefreshing = state.refreshing
-            if (state.error) {
-                Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_LONG)
-                    .setAction(R.string.retry_loading) { viewModel.loadPosts() }.show()
+        lifecycleScope.launchWhenCreated {
+            adapter.loadStateFlow.collectLatest { loadStates ->
+                val refresh = loadStates.refresh
+                binding.progress.isVisible = refresh is LoadState.Loading
+                binding.swiperefresh.isRefreshing = refresh is LoadState.Loading
+
+                if (refresh is LoadState.Error) {
+                    Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_LONG)
+                        .setAction(R.string.retry_loading) { adapter.retry() }
+                        .show()
+                }
             }
         }
         lifecycleScope.launchWhenCreated {
