@@ -76,6 +76,7 @@ dependencies {
     implementation(libs.ucrop)
     implementation(libs.hilt.android)
     implementation(libs.androidx.paging.runtime.ktx)
+    implementation(libs.timber)
     ksp(libs.hilt.compiler)
     coreLibraryDesugaring(libs.desugaring)
 }
