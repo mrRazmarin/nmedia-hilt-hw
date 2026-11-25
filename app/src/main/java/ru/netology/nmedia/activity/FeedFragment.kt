@@ -40,6 +40,10 @@ class FeedFragment : Fragment() {
                 viewModel.likeById(post.id)
             }
 
+            override fun onDislike(post: Post) {
+                viewModel.dislikeById(post.id)
+            }
+
             override fun onRemove(post: Post) {
                 viewModel.removeById(post.id)
             }
@@ -86,6 +90,14 @@ class FeedFragment : Fragment() {
         lifecycleScope.launchWhenCreated {
             adapter.loadStateFlow.collectLatest {
                 binding.swiperefresh.isRefreshing = it.refresh is LoadState.Loading
+            }
+        }
+        
+        lifecycleScope.launchWhenCreated {
+            viewModel.snackbar.observe(viewLifecycleOwner) { message ->
+                message?.let {
+                    Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
+                }
             }
         }
 

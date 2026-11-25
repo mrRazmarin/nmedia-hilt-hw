@@ -23,6 +23,7 @@ import ru.netology.nmedia.model.FeedModelState
 import ru.netology.nmedia.model.PhotoModel
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.util.SingleLiveEvent
+import timber.log.Timber
 import javax.inject.Inject
 
 private val empty = Post(
@@ -72,6 +73,10 @@ class PostViewModel @Inject constructor(
     val photo: LiveData<PhotoModel>
         get() = _photo
 
+    private val _snackbar = SingleLiveEvent<String?>()
+    val snackbar: LiveData<String?>
+        get() = _snackbar
+
     fun save() {
         edited.value?.let {
             viewModelScope.launch {
@@ -82,7 +87,8 @@ class PostViewModel @Inject constructor(
 
                     _postCreated.value = Unit
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    Timber.e(e, "Error saving post")
+                    _snackbar.value = e.message
                 }
             }
         }
@@ -107,10 +113,62 @@ class PostViewModel @Inject constructor(
     }
 
     fun likeById(id: Long) {
-        TODO()
+        viewModelScope.launch {
+            try {
+                repository.likeById(id)
+            } catch (e: Exception) {
+                Timber.e(e, "Error liking post with id: $id")
+                _snackbar.value = e.message
+                updateLikeState(id, false)
+            }
+        }
+    }
+
+    fun dislikeById(id: Long) {
+        viewModelScope.launch {
+            try {
+                repository.dislikeById(id)
+            } catch (e: Exception) {
+                Timber.e(e, "Error disliking post with id: $id")
+                _snackbar.value = e.message
+                updateLikeState(id, true)
+            }
+        }
     }
 
     fun removeById(id: Long) {
-        TODO()
+        viewModelScope.launch {
+            try {
+                repository.removeById(id)
+            } catch (e: Exception) {
+                Timber.e(e, "Error removing post with id: $id")
+                _snackbar.value = e.message
+                updateLikeState(id, true)
+            }
+        }
+    }
+
+    private fun updateLikeState(id: Long, likedByMe: Boolean) {
+        viewModelScope.launch {
+            try {
+                val post = repository.getPostById(id)
+                if (post != null) {
+                    repository.updateLikeState(id, likedByMe)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error updating like state for post id: $id")
+            }
+        }
+    }
+
+    fun refreshData() {
+        viewModelScope.launch {
+            try {
+                repository.refreshData()
+            } catch (e: Exception) {
+                Timber.e(e, "Error refreshing data")
+                _snackbar.value = e.message
+            }
+        }
     }
 }

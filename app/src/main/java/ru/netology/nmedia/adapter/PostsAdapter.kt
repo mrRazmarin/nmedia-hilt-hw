@@ -6,7 +6,6 @@ import android.view.ViewGroup
 import android.widget.PopupMenu
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBindings
 import androidx.viewpager.widget.PagerAdapter
@@ -22,6 +21,7 @@ import ru.netology.nmedia.view.loadCircleCrop
 
 interface OnInteractionListener {
     fun onLike(post: Post) {}
+    fun onDislike(post: Post) {}
     fun onEdit(post: Post) {}
     fun onRemove(post: Post) {}
     fun onShare(post: Post) {}
@@ -107,7 +107,11 @@ class PostViewHolder(
             }
 
             like.setOnClickListener {
-                onInteractionListener.onLike(post)
+                if (post.likedByMe) {
+                    onInteractionListener.onDislike(post)
+                } else {
+                    onInteractionListener.onLike(post)
+                }
             }
 
             share.setOnClickListener {
@@ -119,11 +123,7 @@ class PostViewHolder(
 
 class PostDiffCallback : DiffUtil.ItemCallback<FeedItem>() {
     override fun areItemsTheSame(oldItem: FeedItem, newItem: FeedItem): Boolean {
-        if (oldItem::class != newItem::class) {
-            return false
-        }
-
-        return oldItem.id == newItem.id
+        return oldItem::class == newItem::class && oldItem.id == newItem.id
     }
 
     override fun areContentsTheSame(oldItem: FeedItem, newItem: FeedItem): Boolean {
