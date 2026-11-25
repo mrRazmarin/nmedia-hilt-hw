@@ -28,6 +28,12 @@ interface PostDao {
     @Query("DELETE FROM PostEntity WHERE id = :id")
     suspend fun removeById(id: Long)
 
+    @Query("UPDATE PostEntity SET likedByMe = :likedByMe WHERE id = :id")
+    suspend fun updateLikeState(id: Long, likedByMe: Boolean)
+
+    @Query("SELECT * FROM PostEntity WHERE id = :id")
+    suspend fun getPostById(id: Long): PostEntity?
+
     @Query("DELETE FROM PostEntity")
     suspend fun clear()
 }

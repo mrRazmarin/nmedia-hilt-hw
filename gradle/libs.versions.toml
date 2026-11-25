@@ -50,6 +50,7 @@ firebase = { group = "com.google.firebase", name = "firebase-bom", version.ref =
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 play-services = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServices" }
 desugaring = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugaring" }
+timber = { module = "com.jakewharton.timber:timber", version = "5.0.1" }
 ucrop = { module = "com.github.yalantis:ucrop", version.ref = "ucrop" }
 
 [plugins]

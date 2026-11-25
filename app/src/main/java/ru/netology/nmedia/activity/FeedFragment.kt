@@ -40,6 +40,10 @@ class FeedFragment : Fragment() {
                 viewModel.likeById(post.id)
             }
 
+            override fun onDislike(post: Post) {
+                viewModel.dislikeById(post.id)
+            }
+
             override fun onRemove(post: Post) {
                 viewModel.removeById(post.id)
             }
@@ -64,12 +68,17 @@ class FeedFragment : Fragment() {
                 adapter.retry()
             },
         )
-        viewModel.dataState.observe(viewLifecycleOwner) { state ->
-            binding.progress.isVisible = state.loading
-            binding.swiperefresh.isRefreshing = state.refreshing
-            if (state.error) {
-                Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_LONG)
-                    .setAction(R.string.retry_loading) { viewModel.loadPosts() }.show()
+        lifecycleScope.launchWhenCreated {
+            adapter.loadStateFlow.collectLatest { loadStates ->
+                val refresh = loadStates.refresh
+                binding.progress.isVisible = refresh is LoadState.Loading
+                binding.swiperefresh.isRefreshing = refresh is LoadState.Loading
+
+                if (refresh is LoadState.Error) {
+                    Snackbar.make(binding.root, R.string.error_loading, Snackbar.LENGTH_LONG)
+                        .setAction(R.string.retry_loading) { adapter.retry() }
+                        .show()
+                }
             }
         }
         lifecycleScope.launchWhenCreated {
@@ -81,8 +90,14 @@ class FeedFragment : Fragment() {
         lifecycleScope.launchWhenCreated {
             adapter.loadStateFlow.collectLatest {
                 binding.swiperefresh.isRefreshing = it.refresh is LoadState.Loading
-                        || it.append is LoadState.Loading
-                        || it.prepend is LoadState.Loading
+            }
+        }
+        
+        lifecycleScope.launchWhenCreated {
+            viewModel.snackbar.observe(viewLifecycleOwner) { message ->
+                message?.let {
+                    Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
+                }
             }
         }
 

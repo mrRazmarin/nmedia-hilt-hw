@@ -2,27 +2,28 @@ package ru.netology.nmedia.viewmodel
 
 import android.net.Uri
 import androidx.core.net.toFile
-import androidx.lifecycle.*
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.auth.AppAuth
 import ru.netology.nmedia.dto.FeedItem
 import ru.netology.nmedia.dto.MediaUpload
 import ru.netology.nmedia.dto.Post
-import ru.netology.nmedia.model.FeedModel
 import ru.netology.nmedia.model.FeedModelState
 import ru.netology.nmedia.model.PhotoModel
 import ru.netology.nmedia.repository.PostRepository
 import ru.netology.nmedia.util.SingleLiveEvent
+import timber.log.Timber
 import javax.inject.Inject
 
 private val empty = Post(
@@ -72,29 +73,9 @@ class PostViewModel @Inject constructor(
     val photo: LiveData<PhotoModel>
         get() = _photo
 
-    init {
-        loadPosts()
-    }
-
-    fun loadPosts() = viewModelScope.launch {
-        try {
-            _dataState.value = FeedModelState(loading = true)
-            repository.getAll()
-            _dataState.value = FeedModelState()
-        } catch (e: Exception) {
-            _dataState.value = FeedModelState(error = true)
-        }
-    }
-
-    fun refreshPosts() = viewModelScope.launch {
-        try {
-            _dataState.value = FeedModelState(refreshing = true)
-            repository.getAll()
-            _dataState.value = FeedModelState()
-        } catch (e: Exception) {
-            _dataState.value = FeedModelState(error = true)
-        }
-    }
+    private val _snackbar = SingleLiveEvent<String?>()
+    val snackbar: LiveData<String?>
+        get() = _snackbar
 
     fun save() {
         edited.value?.let {
@@ -106,7 +87,8 @@ class PostViewModel @Inject constructor(
 
                     _postCreated.value = Unit
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    Timber.e(e, "Error saving post")
+                    _snackbar.value = e.message
                 }
             }
         }
@@ -131,10 +113,62 @@ class PostViewModel @Inject constructor(
     }
 
     fun likeById(id: Long) {
-        TODO()
+        viewModelScope.launch {
+            try {
+                repository.likeById(id)
+            } catch (e: Exception) {
+                Timber.e(e, "Error liking post with id: $id")
+                _snackbar.value = e.message
+                updateLikeState(id, false)
+            }
+        }
+    }
+
+    fun dislikeById(id: Long) {
+        viewModelScope.launch {
+            try {
+                repository.dislikeById(id)
+            } catch (e: Exception) {
+                Timber.e(e, "Error disliking post with id: $id")
+                _snackbar.value = e.message
+                updateLikeState(id, true)
+            }
+        }
     }
 
     fun removeById(id: Long) {
-        TODO()
+        viewModelScope.launch {
+            try {
+                repository.removeById(id)
+            } catch (e: Exception) {
+                Timber.e(e, "Error removing post with id: $id")
+                _snackbar.value = e.message
+                updateLikeState(id, true)
+            }
+        }
+    }
+
+    private fun updateLikeState(id: Long, likedByMe: Boolean) {
+        viewModelScope.launch {
+            try {
+                val post = repository.getPostById(id)
+                if (post != null) {
+                    repository.updateLikeState(id, likedByMe)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error updating like state for post id: $id")
+            }
+        }
+    }
+
+    fun refreshData() {
+        viewModelScope.launch {
+            try {
+                repository.refreshData()
+            } catch (e: Exception) {
+                Timber.e(e, "Error refreshing data")
+                _snackbar.value = e.message
+            }
+        }
     }
 }
